@@ -8,6 +8,7 @@ import {
 const app = require("express")();
 const http = require("http").Server(app);
 const io = require("socket.io")(http);
+const fs = require("fs");
 const yargs = require("yargs/yargs");
 const { hideBin } = require("yargs/helpers");
 
@@ -18,15 +19,23 @@ const { argv } = yargs(hideBin(process.argv))
     describe: "Port to bind on",
     default: 3000,
   })
-  .option("greeting", {
-    describe: "Message to display on join",
-    default: "Connected!",
+  .option("greetings-file", {
+    describe:
+      "A file containing a greeting that is displayed a client upon connect.",
   })
   .option("verbose", {
     alias: "v",
     type: "boolean",
     description: "Run with verbose logging",
   });
+
+const greeting = (() => {
+  try {
+    return fs.readFileSync(argv.greetingsFile).toString();
+  } catch {
+    return "Connected!";
+  }
+})();
 
 io.use((socket: any, next: any) => {
   socket.publicKey = socket.handshake.auth.publicKey;
@@ -45,7 +54,7 @@ io.on("connection", (socket: any) => {
   socket.on("challenge", (solution: string) => {
     if (solution === challenge) {
       socket.join(socket.publicKey);
-      socket.emit("hello", argv.greeting);
+      socket.emit("hello", greeting);
       socket.on("patch", (patch: any) => {
         if (patch.senderKey === publicKey) {
           if (argv.verbose) {
