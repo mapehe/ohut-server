@@ -4,6 +4,7 @@ import {
   publicEncryptData,
   transmissionEncoding,
 } from "./cryptography";
+import { getTrustedKeys } from "./utils";
 
 const app = require("express")();
 const http = require("http").Server(app);
@@ -23,6 +24,10 @@ const { argv } = yargs(hideBin(process.argv))
     describe:
       "A file containing a greeting that is displayed a client upon connect.",
   })
+  .option("trusted-keys-dir", {
+    describe:
+      "A directory containing public key files in pkcs8 format. Only clients with these public keys are allowed to connect.",
+  })
   .option("verbose", {
     alias: "v",
     type: "boolean",
@@ -37,9 +42,15 @@ const greeting = (() => {
   }
 })();
 
+const trustedKeys = getTrustedKeys(argv.trustedKeysDir);
+
 io.use((socket: any, next: any) => {
-  socket.publicKey = socket.handshake.auth.publicKey;
-  return next();
+  const { publicKey } = socket.handshake.auth.publicKey;
+  if (trustedKeys.includes(publicKey) || trustedKeys.length === 0) {
+    socket.publicKey = publicKey;
+    return next();
+  }
+  return Error("Unauthorized");
 });
 
 io.on("connection", (socket: any) => {
