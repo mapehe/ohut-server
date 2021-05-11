@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "module": "commonjs",
+    "outDir": "bin",
+    "sourceMap": true,
+    "rootDir": "src",
+    "strictNullChecks": true,
+
+    "experimentalDecorators": true,
+    "noEmitOnError": true,
+    "noImplicitAny": true,
+    "removeComments": false
+  },
+  "exclude": ["bin", "node_modules"]
+}
