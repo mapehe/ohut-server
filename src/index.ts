@@ -1,64 +1,72 @@
-import {
-  generateChallenge,
-  localEncoding,
-  publicEncryptData,
-  transmissionEncoding,
-} from "./cryptography";
+import { createPublicKey, publicEncrypt } from 'crypto'
+import { generateChallenge, encoding, checkSolution } from './cryptography'
 
-const app = require("express")();
-const http = require("http").Server(app);
-const io = require("socket.io")(http);
-const yargs = require("yargs/yargs");
-const { hideBin } = require("yargs/helpers");
+const app = require('express')()
+const http = require('http').Server(app)
+const io = require('socket.io')(http)
+const fs = require('fs')
+const yargs = require('yargs/yargs')
+const { hideBin } = require('yargs/helpers')
 
-const publicKeyMismatch = "WARNING: Sender key mismatch.";
+const publicKeyMismatch = 'WARNING: Sender key mismatch.'
 
 const { argv } = yargs(hideBin(process.argv))
-  .option("port", {
-    describe: "Port to bind on",
-    default: 3000,
+  .option('port', {
+    describe: 'Port to bind on',
+    default: 3000
   })
-  .option("greeting", {
-    describe: "Message to display on join",
-    default: "Connected!",
+  .option('greetings-file', {
+    describe:
+      'A file containing a greeting that is displayed a client upon connect.'
   })
-  .option("verbose", {
-    alias: "v",
-    type: "boolean",
-    description: "Run with verbose logging",
-  });
+  .option('verbose', {
+    alias: 'v',
+    type: 'boolean',
+    description: 'Run with verbose logging'
+  })
+
+const greeting = (() => {
+  try {
+    return fs.readFileSync(argv.greetingsFile).toString()
+  } catch {
+    return 'Connected!'
+  }
+})()
 
 io.use((socket: any, next: any) => {
-  socket.publicKey = socket.handshake.auth.publicKey;
-  return next();
-});
+  socket.room = socket.handshake.auth.publicKey
+  return next()
+})
 
-io.on("connection", (socket: any) => {
-  const { publicKey } = socket;
-  const challenge = generateChallenge();
-  const encryptedChallenge = publicEncryptData(
-    challenge,
-    Buffer.from(publicKey, transmissionEncoding).toString(localEncoding)
-  );
-  socket.emit("challenge", encryptedChallenge);
-
-  socket.on("challenge", (solution: string) => {
-    if (solution === challenge) {
-      socket.join(socket.publicKey);
-      socket.emit("hello", argv.greeting);
-      socket.on("patch", (patch: any) => {
-        if (patch.senderKey === publicKey) {
+io.on('connection', (socket: any) => {
+  const { room } = socket
+  const publicKey = createPublicKey(room)
+  const challenge = generateChallenge()
+  const encryptedChallenge = publicEncrypt(publicKey, challenge)
+  socket.emit('challenge', encryptedChallenge)
+  socket.on('solution', (solution: Buffer) => {
+    if (checkSolution(challenge, solution)) {
+      socket.join(room)
+      socket.emit('hello', greeting)
+      socket.on('patch', (patch: any) => {
+        if (
+          patch.senderKey.toString(encoding) ===
+          publicKey.export({ format: 'pem', type: 'pkcs1' }).toString()
+        ) {
           if (argv.verbose) {
-            console.log(patch);
+            console.log(patch)
           }
-          io.to(patch.destinationKey).emit("patch", patch);
+          const destinationRoom = patch.destinationKey.toString(encoding)
+          socket.to(destinationRoom).emit('patch', patch)
         }
-        socket.emit("error", new Error(publicKeyMismatch));
-      });
+        socket.emit('error', new Error(publicKeyMismatch))
+      })
+    } else {
+      socket.disconnect()
     }
-  });
-});
+  })
+})
 
 http.listen(argv.port, () => {
-  console.log(`ohut-server listening to port ${argv.port}`);
-});
+  console.log(`ohut-server listening to port ${argv.port}`)
+})

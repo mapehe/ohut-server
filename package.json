@@ -1,6 +1,15 @@
 {
   "name": "ohut-server",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "description": "A relay server for ohut.",
+  "keywords": [
+    "collaboration",
+    "productivity",
+    "pair",
+    "programming",
+    "remote",
+    "git"
+  ],
   "author": "Matias Heikkilä <matias@three.consulting>",
   "license": "MIT",
   "repository": {
@@ -35,7 +44,7 @@
   "scripts": {
     "dev": "ts-node ./src/index.ts",
     "lint": "npx prettier --write . && npx eslint . --ext .ts",
-    "prepare": "npx tsc",
+    "prepare": "rm -rf ./bin && npx tsc",
     "build": "npx tsc"
   },
   "lint-staged": {
@@ -43,5 +52,10 @@
       "prettier --write"
     ],
     "*.{js,css,md}": "prettier --write"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "semi": false,
+    "trailingComma": "none"
   }
 }
