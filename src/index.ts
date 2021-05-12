@@ -1,4 +1,4 @@
-import { publicEncrypt } from "crypto";
+import { createPublicKey, publicEncrypt } from "crypto";
 import { generateChallenge, encoding, checkSolution } from "./cryptography";
 
 const app = require("express")();
@@ -39,35 +39,32 @@ io.use((socket: any, next: any) => {
 });
 
 io.on("connection", (socket: any) => {
-  try {
-    const { room } = socket;
-    const publicKey = Buffer.from(room, encoding);
-    const challenge = generateChallenge();
-    const encryptedChallenge = publicEncrypt(publicKey, challenge);
-    socket.emit("challenge", encryptedChallenge);
-    socket.on("solution", (solution: Buffer) => {
-      if (checkSolution(challenge, solution)) {
-        socket.join(room);
-        socket.emit("hello", greeting);
-        socket.on("patch", (patch: any) => {
-          if (
-            patch.senderKey.toString(encoding) === publicKey.toString(encoding)
-          ) {
-            if (argv.verbose) {
-              console.log(patch);
-            }
-            const destinationRoom = patch.destinationKey.toString(encoding);
-            io.to(destinationRoom).emit("patch", patch);
+  const { room } = socket;
+  const publicKey = createPublicKey(room);
+  const challenge = generateChallenge();
+  const encryptedChallenge = publicEncrypt(publicKey, challenge);
+  socket.emit("challenge", encryptedChallenge);
+  socket.on("solution", (solution: Buffer) => {
+    if (checkSolution(challenge, solution)) {
+      socket.join(room);
+      socket.emit("hello", greeting);
+      socket.on("patch", (patch: any) => {
+        if (
+          patch.senderKey.toString(encoding) ===
+          publicKey.export({ format: "pem", type: "pkcs1" }).toString()
+        ) {
+          if (argv.verbose) {
+            console.log(patch);
           }
-          socket.emit("error", new Error(publicKeyMismatch));
-        });
-      } else {
-        socket.disconnect();
-      }
-    });
-  } catch (error) {
-    console.log(error);
-  }
+          const destinationRoom = patch.destinationKey.toString(encoding);
+          io.to(destinationRoom).emit("patch", patch);
+        }
+        socket.emit("error", new Error(publicKeyMismatch));
+      });
+    } else {
+      socket.disconnect();
+    }
+  });
 });
 
 http.listen(argv.port, () => {
