@@ -1,12 +1,12 @@
 const crypto = require("crypto");
 
-export const localEncoding = "utf8";
-export const transmissionEncoding = "base64";
+export const encoding = "utf-8";
+const hashAlgorithm = "sha256";
 
-export const publicEncryptData = (data: string, publicKey: string): string => {
-  const buffer = Buffer.from(data, localEncoding);
-  const encrypted = crypto.publicEncrypt(publicKey, buffer);
-  return encrypted.toString(transmissionEncoding);
-};
+const hashData = (data: Buffer) =>
+  crypto.createHash(hashAlgorithm).update(data).digest();
 
-export const generateChallenge = () => crypto.randomBytes(128).toString();
+export const generateChallenge = () => crypto.randomBytes(128);
+
+export const checkSolution = (challenge: Buffer, solution: Buffer): boolean =>
+  solution.equals(hashData(challenge));
